@@ -1,26 +1,42 @@
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { KanbanBoard } from "@/components/KanbanBoard";
+import { Workspace } from "@/components/Workspace";
+import { initialData } from "@/lib/kanban";
+
+const mockFetch = vi.fn();
+global.fetch = mockFetch;
+
+beforeEach(() => {
+  mockFetch.mockReset();
+  mockFetch.mockResolvedValue({ ok: true });
+});
 
 const getFirstColumn = () => screen.getAllByTestId(/column-/i)[0];
 
+const renderBoard = () =>
+  render(<Workspace initialBoard={initialData} onLogout={() => {}} />);
+
 describe("KanbanBoard", () => {
   it("renders five columns", () => {
-    render(<KanbanBoard />);
+    renderBoard();
     expect(screen.getAllByTestId(/column-/i)).toHaveLength(5);
   });
 
   it("renames a column", async () => {
-    render(<KanbanBoard />);
+    renderBoard();
     const column = getFirstColumn();
     const input = within(column).getByLabelText("Column title");
     await userEvent.clear(input);
     await userEvent.type(input, "New Name");
     expect(input).toHaveValue("New Name");
+    expect(mockFetch).toHaveBeenCalledWith(
+      "/api/board",
+      expect.objectContaining({ method: "PUT" })
+    );
   });
 
   it("adds and removes a card", async () => {
-    render(<KanbanBoard />);
+    renderBoard();
     const column = getFirstColumn();
     const addButton = within(column).getByRole("button", {
       name: /add a card/i,

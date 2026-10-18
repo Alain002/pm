@@ -1,4 +1,16 @@
 import { expect, test } from "@playwright/test";
+import { resetBoard } from "./helpers";
+
+test.beforeEach(async ({ page, baseURL }) => {
+  await resetBoard(baseURL);
+  await page.goto("/");
+  await page.getByLabel(/username/i).fill("user");
+  await page.getByLabel(/password/i).fill("password");
+  await page.getByRole("button", { name: /^sign in$/i }).click();
+  await expect(
+    page.getByRole("heading", { name: "Kanban Studio" })
+  ).toBeVisible();
+});
 
 test("loads the kanban board", async ({ page }) => {
   await page.goto("/");
@@ -38,4 +50,35 @@ test("moves a card between columns", async ({ page }) => {
   );
   await page.mouse.up();
   await expect(targetColumn.getByTestId("card-card-1")).toBeVisible();
+});
+
+test("persists board changes across reloads", async ({ page }) => {
+  await page.goto("/");
+  const firstColumn = page.locator('[data-testid^="column-"]').first();
+  const titleInput = firstColumn.getByLabel("Column title");
+
+  const saved = page.waitForResponse(
+    (response) =>
+      response.url().includes("/api/board") &&
+      response.request().method() === "PUT"
+  );
+  await titleInput.fill("Ideas");
+  await saved;
+
+  await page.reload();
+  await expect(
+    page.locator('[data-testid^="column-"]').first().getByLabel("Column title")
+  ).toHaveValue("Ideas");
+
+  const restored = page.waitForResponse(
+    (response) =>
+      response.url().includes("/api/board") &&
+      response.request().method() === "PUT"
+  );
+  await page
+    .locator('[data-testid^="column-"]')
+    .first()
+    .getByLabel("Column title")
+    .fill("Backlog");
+  await restored;
 });
